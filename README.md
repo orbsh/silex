@@ -24,7 +24,7 @@ Silex，拉丁语"燧石/硅石"——沙子的核心成分，半导体与光导
 
 ## 定位
 
-接收业务需求 + 判定指标 → 端到端"降维编译"为本地微型 ML 资产（LightGBM 级 ONNX）。LLM 只在两处的离线时刻出现：
+接收业务需求 + 判定指标 → 端到端"降维编译"为本地微型 ML 资产（50MB 级 ONNX；算法选型偏好见 `matrix.md`「选型偏好」——总计算量差距不大时优先神经网络路线）。LLM 只在两处的离线时刻出现：
 
 1. **阶段 1**：查 ISA 矩阵做路由判定（决定任务归哪层）
 2. **阶段 2**：充当合成数据标注员（打标 + 同义改写扩增）
@@ -48,7 +48,8 @@ silex/
 │       ├── lib.py         # predict_dist 链接推理（Python 参照实现，Rust 重放规格）
 │       ├── train.py       # 铸塔：拟合 + 导出 embed.onnx / model.onnx / manifest.json
 │       └── gate.py        # 磐石门禁：双层校验
-├── examples/daily-score/  # 端到端实例（含门禁暴露偏差→飞轮回边的完整演示）
+├── cases/                # 案例集：一案例一目录，持续追加（布局约定见 cases/README.md）
+│   └── daily-score/      # 端到端实例（含门禁暴露偏差→飞轮回边的完整演示）
 └── runtime/DESIGN.md      # Rust 在线塔基设计（代码下一里程碑）
 ```
 
@@ -56,11 +57,11 @@ silex/
 
 ```bash
 uv venv .venv && uv pip install -p .venv/bin/python scikit-learn lightgbm onnxmltools skl2onnx onnx onnxruntime
-.venv/bin/python examples/daily-score/gen_data.py
-.venv/bin/python skill/scripts/train.py --data examples/daily-score/data.csv \
-    --strategy examples/daily-score/strategy.json --out examples/daily-score/dist/
-.venv/bin/python skill/scripts/gate.py --dist examples/daily-score/dist \
-    --synthetic examples/daily-score/data.csv --truth examples/daily-score/truth.csv --min 0.85
+.venv/bin/python cases/daily-score/gen_data.py
+.venv/bin/python skill/scripts/train.py --data cases/daily-score/data.csv \
+    --strategy cases/daily-score/strategy.json --out cases/daily-score/dist/
+.venv/bin/python skill/scripts/gate.py --dist cases/daily-score/dist \
+    --synthetic cases/daily-score/data.csv --truth cases/daily-score/truth.csv --min 0.85
 ```
 
 实例真实运行轨迹：宽松合成标注 → 一致性 1.0 / 真值 0.83 → 门禁拒绝（exit 1）；收紧标注口径重训 → 真值 1.0 → 放行（exit 0）。**门禁按设计暴露了"模型↔LLM 一致 ≠ 模型↔业务真值一致"**——这正是双层校验存在的理由。

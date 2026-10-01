@@ -1,4 +1,4 @@
-# 生成 examples/daily-score 的合成数据集与人工核验真值集
+# 生成 cases/daily-score 的合成数据集与人工核验真值集
 # 真值用独立规则定义（比 LLM 标注更"挑剔"），用于演示门禁能暴露合成标注与业务真值的偏差
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ good = ["今天完成了订单模块联调，测试通过", "修复了登录超�
 bad = ["随便看看", "摸鱼一天", "无", "还行吧", "今天啥也没干"]
 syn = make(good, 200) + make(bad, 100) + make(good + bad, 50)  # 含难样本
 syn_lbl = [1 if any(g in t for g in good) else 0 for t in syn]
-pd.DataFrame({"text": syn, "label": syn_lbl}).to_csv("examples/daily-score/data.csv", index=False)
+pd.DataFrame({"text": syn, "label": syn_lbl}).to_csv("cases/daily-score/data.csv", index=False)
 
 # 真值（人工规则更严：要求含"具体动作动词"，把部分合成正样本判为负）
 strict_neg = ["配合前端完成接口对接，联调顺利", "还行吧"]
@@ -29,5 +29,5 @@ for t in truth:
     # 人工口径：必须是"完成/修复/排查/定位/整理"这类实质动作，且非水话
     ok = any(k in t for k in ["完成", "修复", "排查", "定位", "整理"]) and t not in strict_neg
     truth_lbl.append(1 if ok else 0)
-pd.DataFrame({"text": truth, "label": truth_lbl}).to_csv("examples/daily-score/truth.csv", index=False)
+pd.DataFrame({"text": truth, "label": truth_lbl}).to_csv("cases/daily-score/truth.csv", index=False)
 print("data.csv", len(syn), "truth.csv", len(truth))

@@ -4,4 +4,4 @@ __pycache__/
 examples/*/data.csv
 examples/*/data_strict.csv
 examples/*/truth.csv
-examples/*/dist/
+cases/*/dist/
