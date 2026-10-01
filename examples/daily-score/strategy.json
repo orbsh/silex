@@ -1,0 +1,10 @@
+{
+  "task": "classification",
+  "algo": "lightgbm",
+  "n_estimators": 60,
+  "threshold": 0.5,
+  "features": {
+    "tfidf": {"max_features": 120, "svd": 8},
+    "stats": ["char_len", "char_count:！", "keyword_hit:完成", "keyword_hit:修复"]
+  }
+}

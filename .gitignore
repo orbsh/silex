@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+examples/*/data.csv
+examples/*/data_strict.csv
+examples/*/truth.csv
+examples/*/dist/
