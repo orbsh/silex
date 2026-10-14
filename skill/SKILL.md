@@ -66,6 +66,7 @@ memento_create(
 uv run python skill/scripts/train.py --data data.csv --strategy strategy.json --out dist/
 ```
 产出 `dist/model.onnx`（+可选 `dist/embed.onnx`、`manifest.json`）。
+策略为预训练编码器路线时，本阶段改为「微调（或冻结嵌入 + 线性头）→ 导出 ONNX → int8 量化」，backbone 选择、超参与坑见 `encoder-route.md`；该路线脚本未实现，流程定案前不动共享脚本。
 
 **阶段 4 · 磐石门禁（双层，脚本强制真值集）**
 准备 ≥20 条**人工核验**样本 `truth.csv`（向用户索要或从其真实业务日志中人工标——合成集只度量模型与标注 LLM 的一致性，度量不了业务真值）。
