@@ -24,8 +24,27 @@
 | 中文 | `qihoo360/Zhinao-ChineseModernBert` | Base 级（除 Embedding 外约 100M）；8192 | 模型卡声明 CLUE 综合超 RoBERTa-wwm-large，未逐项核实 |
 | 中文兜底 | 中文 RoBERTa-wwm | — | 现成方案，无长上下文优势 |
 | 多语 | `jhu-clsp/mmBERT`（small/base/large） | 1800+ 语言、3T+ tokens，ModernBERT 架构 | 发布博客核实；各尺寸参数量未逐项核实 |
+| 英文 + 代码 | `chandar-lab/NeoBERT` | 250M、4096；SwiGLU + Pre-RMSNorm，28 层 | **未核实**：论文声称 4K 上比 ModernBERT-base 快约 47%，属单篇论文单硬件，必须本机复测；上下文只有 ModernBERT 的一半 |
+| 英文 + 代码（长文） | `nomic-ai/nomic-bert-2048` 及长上下文变体 | 137M；基座 2048，8192 属变体 | **未核实**：各变体的原生上下文与许可需逐个核对模型卡 |
+| 零样本（另一任务形态） | GLiNER（`urchade/GLiNER`、`knowledgator/gliner-*`） | ~200M；默认上下文短，长变体存在 | 见 §1b；它不是分类头，导出与门禁形态都不同 |
 
 原版 ModernBERT 只吃英文 + 代码，中文会碎成字节级 token，不要直接用在中文任务上。
+
+## 1b. 任务形态：嵌入、跨度头、零样本标签器
+
+材料里这三样经常被当成一件事，它们不能互换：
+
+| 形态 | 代表 | 产出 | 数据门槛 | 新标签的成本 |
+|---|---|---|---|---|
+| 句子嵌入 | 现行 `bge-small-zh-v1.5`；任何编码器加池化 | 一段文本一个向量，供检索 | 无（预训练即有） | 不适用 |
+| 固定分类头 | ModernBERT / NeoBERT + token-classification 或 span head | 每次前向直接给出边界与类别 | ~千条对齐数据起步（§3.1） | 换头或重训 |
+| 零样本标签器 | GLiNER | 调用时把标签当文本，与文本一起编码 | 无 | 零 |
+
+「去掉池化层就是一个编码器」这句话对每个编码器都成立，因此它不回答「能不能找准实体边界」——边界能力来自训练目标与头，不来自去掉某层。
+
+选型判据是**标签的变动频率**，不是阶段先后：高频且稳定的标签走固定头（一次前向、成本最低）；长尾、仍在演化的标签走零样本，直到某一类攒够数据、值得自己的头。这与本项目「词汇表随运行演化」的定位一致——固定头把词汇表冻在训练时刻，零样本不冻但失败静默（没有标签就没有度量）。
+
+零样本标签器还有一处与本仓相关的形态差别：它不能作为 `dist/` 里的 ONNX 分类资产交付——标签是输入的一部分。如果采用，它的位置是**合成标注的来源**（阶段 2 的一个变体），不是在线链路的 L3。
 
 ## 2. 链条定义
 
@@ -104,6 +123,9 @@ tokenizer（Rust tokenizers crate，tokenizer.json 随资产交付）→ encoder
 - 池化选择（mean vs cls）是否固化成策略字段。
 - int8 漂移在业务真值集上的可接受阈值。
 - 微调在哪台机器跑、要不要 GPU：零 GPU 约束下只有形 B 可行，全量微调要 GPU 或数小时 CPU。
+- NeoBERT 是否进候选：上下文 4096 对长文通道是硬上限，速度优势是单篇论文的单硬件数字；在没有编码器案例可测之前，它留在候选表里、不进配方。
+- 零样本标签器的身份：当阶段 2 的合成标注来源，还是在线的 token 分类资产？前者不出 ONNX，后者要按形 A 导出并通过双层门禁，两条路的验收完全不同。
+- 混合语料（中文正文 + 英文标识符，如「SQLite 的 concurrency 在写密集下不行」）上的边界 F1：现有全部候选都没有这个数，而它才是本仓业务语料的实际形态。
 - 首个案例目录（`cases/<name>/`）什么时候开：按 `cases/README.md`，脚本改动必须由案例 NOTES 的缺陷驱动，编码器路线同样等这个案例。
 
 ## 参考来源
@@ -116,4 +138,7 @@ tokenizer（Rust tokenizers crate，tokenizer.json 随资产交付）→ encoder
 - HuggingFace blog《mmBERT: ModernBERT goes Multilingual》（多语 backbone）。
 - transformers #38720 / #35545、AnswerDotAI #190 / #225（池化 bug、compile、ONNX 导出、复现前提）。
 - `monju-lab/modernbert-ja-130m-int8-onnx` 模型卡（CPU 延迟与量化锚点，第三方单点测量）。
+- arXiv 2502.19587《NeoBERT: A Next-Generation BERT》与 `chandar-lab/neobert` 仓库（250M、4096、SwiGLU/Pre-RMSNorm；速度数字待本机复测）。
+- GLiNER 论文与 `urchade/GLiNER` 仓库（零样本跨度标注的任务形态；上下文与许可待核）。
+- `nomic-ai/nomic-bert-2048` 及长上下文变体模型卡（基座 2048 vs 变体 8192，待核）。
 - ACL/IJCNLP 2025《ModernBERT or DeBERTaV3?》（控制变量对照：ModernBERT 的确定优势是长上下文与速度，样本效率上上一代 DeBERTaV3 系仍强）。
